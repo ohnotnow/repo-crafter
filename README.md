@@ -31,6 +31,18 @@ export REPO_CRAFTER_REQUIRE_AUTH=true
 npm start
 ```
 
+## Mock API for Local Development
+
+For local development and testing, you can use a mock API to simulate GitHub API calls. This allows you to test the application's logic without needing to connect to the real GitHub API.
+
+To enable the mock API, set the `USE_MOCK_API` environment variable to `true`:
+
+```bash
+export USE_MOCK_API=true
+```
+
+When the mock API is enabled, the application will not make any real calls to GitHub. Instead, it will return predefined responses, allowing you to test the entire flow of the application locally.
+
 ## Issue Template
 
 When a repository is created, a setup issue is automatically generated with the the predefined content and references the newly create admin. The issue template can be found in `src/templates/setup-issue.md` and modified as needed.
@@ -115,10 +127,11 @@ Details on the creation of the GitHub App can be found in [docs/GITHUB_APP_SETUP
 **Optional:**
 - `REPO_CRAFTER_REQUIRE_AUTH` - Enable/disable auth (default: true)
 - `REPO_CRAFTER_CREATE_SETUP_ISSUE` - Enable/disable setup issue (default: true)
+- `USE_MOCK_API` - Enable/disable mock API for local development (default: false)
 
 **GitHub App (Probot):**
 - `APP_ID` - GitHub App ID
-- `PRIVATE_KEY` - GitHub App private key (PEM format)
+- `PRIVATE_KEY_PATH` - Path to the GitHub App private key PEM file
 - `WEBHOOK_SECRET` - Webhook verification secret
 - `CLIENT_ID` - GitHub App client ID
 - `CLIENT_SECRET` - GitHub App client secret
@@ -155,13 +168,36 @@ For automated deployment, configure these secrets in your repository settings:
 
 ## Docker Deployment
 
-```bash
-# Build container
-docker build -t repo-crafter .
+To build and run the application with Docker, you can use the provided `Dockerfile`. This is a convenient way to debug locally without needing to install nodejs/npm.
 
-# Run container
-docker run -e APP_ID=<app-id> -e PRIVATE_KEY=<pem-value> repo-crafter
+### Building the Image
+
+```bash
+# Build the container
+docker build -t repo-crafter .
 ```
+
+### Running the Image
+
+To run the image, you need to provide the necessary environment variables. The easiest way to do this is with an `.env` file.
+
+1.  **Create a `.env` file:**
+    Copy the `.env.example` file to `.env` and fill in the required values. For local development with the mock API, your `.env` file should look like this:
+
+    ```
+    APP_ID=12345
+    PRIVATE_KEY_PATH=test/fixtures/mock-cert.pem
+    WEBHOOK_SECRET=dummy-secret
+    REPO_CRAFTER_REQUIRE_AUTH=false
+    USE_MOCK_API=true
+    ```
+
+2.  **Run the container:**
+
+    ```bash
+    # Run the container with the .env file
+    docker run -d -p 3000:3000 --env-file .env repo-crafter
+    ```
 
 ## Azure Deployment
 
