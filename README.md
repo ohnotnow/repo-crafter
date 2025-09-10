@@ -166,7 +166,7 @@ For automated deployment, configure these secrets in your repository settings:
 | `REPOSITORY_ALREADY_EXISTS` | Repository name already taken | 409 |
 | `REPOSITORY_CREATION_FAILED` | General creation failure | 500 |
 
-## Docker Deployment
+## [DEBUGGING ONLY] Docker Deployment
 
 To build and run the application with Docker, you can use the provided `Dockerfile`. This is a convenient way to debug locally without needing to install nodejs/npm.
 
