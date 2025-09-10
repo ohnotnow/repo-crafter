@@ -39,13 +39,13 @@ yarn-error.log*
 **/.env.production
 
 # Testing
-**/test
-**/tests
-**/__tests__
-**/*.test.*
-**/*.spec.*
-**/vitest.config.*
-**/jest.config.*
+# **/test
+# **/tests
+# **/__tests__
+# **/*.test.*
+# **/*.spec.*
+# **/vitest.config.*
+# **/jest.config.*
 
 # CI/CD
 **/.github
@@ -66,8 +66,8 @@ Dockerfile*
 **/*.pid.lock
 
 # Security
-**/*.pem
-**/*.key
+# **/*.pem
+# **/*.key
 !app.yml
 
 # OS generated files

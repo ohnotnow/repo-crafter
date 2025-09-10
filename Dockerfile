@@ -3,15 +3,11 @@ FROM node:20-alpine AS builder
 
 WORKDIR /usr/src/app
 
-# Copy package files
-COPY package.json package-lock.json ./
+# Copy all files
+COPY . .
 
 # Install all dependencies (including dev dependencies for building)
 RUN npm ci
-
-# Copy source code
-COPY src/ ./src/
-COPY tsconfig.json ./
 
 # Build the application
 RUN npm run build
@@ -26,7 +22,7 @@ RUN addgroup -g 1001 -S nodejs && \
     adduser -S probot -u 1001
 
 # Copy package files
-COPY package.json package-lock.json ./
+COPY --from=builder /usr/src/app/package.json /usr/src/app/package-lock.json ./
 
 # Install only production dependencies
 RUN npm ci --only=production && \
@@ -36,11 +32,12 @@ RUN npm ci --only=production && \
 COPY --from=builder /usr/src/app/lib ./lib
 
 # Copy templates directory (needed for setup issues)
-COPY src/templates ./src/templates
+COPY --from=builder /usr/src/app/src/templates ./src/templates
 
 # Copy other necessary files
-COPY app.yml ./
-COPY .infra/start.sh ./
+COPY --from=builder /usr/src/app/app.yml ./
+COPY --from=builder /usr/src/app/.infra/start.sh ./
+COPY --from=builder /usr/src/app/test/fixtures/mock-cert.pem ./test/fixtures/mock-cert.pem
 
 # Make start script executable
 RUN chmod +x start.sh

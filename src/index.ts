@@ -23,6 +23,7 @@ export default (app: Probot, { getRouter }: { getRouter?: (prefix: string) => an
     const API_KEY = process.env.REPO_CRAFTER_API_KEY || "your-secret-api-key-here";
     const REQUIRE_AUTH = process.env.REPO_CRAFTER_REQUIRE_AUTH !== 'false'; // Default to true
     const CREATE_SETUP_ISSUE = process.env.REPO_CRAFTER_CREATE_SETUP_ISSUE !== 'false'; // Default to true
+    const USE_MOCK_API = process.env.USE_MOCK_API === 'true';
 
     // Add JSON body parsing middleware
     router.use((req: any, _res: any, next: any) => {
@@ -47,6 +48,7 @@ export default (app: Probot, { getRouter }: { getRouter?: (prefix: string) => an
     // Repository creation endpoint
     router.post("/create-repository", async (req: RepositoryRequest, res: Response) => {
       // Authentication check (if enabled)
+      app.log.info("Create repository API called");
       if (REQUIRE_AUTH) {
         const authError = validateApiKey(req, API_KEY);
         if (authError) {
@@ -82,14 +84,37 @@ export default (app: Probot, { getRouter }: { getRouter?: (prefix: string) => an
 
         app.log.info(`Creating ${visibility} repository: ${orgName}/${repoName}`);
         
-        // Find GitHub App installation for the organization
-        const installation = await findInstallation(app, orgName);
-        if (!installation) {
-          return res.json(createInstallationNotFoundError(orgName));
-        }
+        let octokit: any;
 
-        // Create authenticated octokit instance for the installation
-        const octokit = await app.auth(installation.id);
+        if (USE_MOCK_API) {
+          app.log.info("Using mock API");
+          octokit = {
+            repos: {
+              createInOrg: async () => ({
+                data: {
+                  full_name: `${orgName}/${repoName}`,
+                  html_url: `https://github.com/${orgName}/${repoName}`,
+                },
+              }),
+              addCollaborator: async () => ({ status: 204 }),
+              get: async () => { throw { response: { status: 404 } }; },
+            },
+            orgs: {
+              getMembershipForUser: async () => ({ status: 204 }),
+            },
+            issues: {
+              create: async () => ({ status: 201 }),
+            },
+          };
+        } else {
+          // Find GitHub App installation for the organization
+          const installation = await findInstallation(app, orgName);
+          if (!installation) {
+            return res.json(createInstallationNotFoundError(orgName));
+          }
+          // Create authenticated octokit instance for the installation
+          octokit = await app.auth(installation.id);
+        }
 
         // Validate repository admin is a member of the organization if specified
         if (repositoryAdmin) {
