@@ -198,6 +198,16 @@ To run the image, you need to provide the necessary environment variables. The e
     # Run the container with the .env file
     docker run -d -p 3000:3000 --env-file .env repo-crafter
     ```
+3.  **Try running curl against the container:**
+
+    ```bash
+    curl -X POST http://localhost:3000/repo-crafter/create-repository \
+    -H "Content-Type: application/json" \
+    -d '{"organization": "my-mock-org",
+         "repositoryName": "my-mock-repo",
+         "repositoryAdmin": "mock-user",
+         "visibility": "private"}'
+    ```
 
 ## Azure Deployment
 
