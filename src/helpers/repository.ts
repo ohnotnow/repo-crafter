@@ -1,6 +1,6 @@
 // Repository-related operations and validations
 
-import { ApiError } from './types.js';
+import type { ApiError, AppLogger } from './types.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -10,13 +10,16 @@ import * as path from 'path';
 export async function validateOrganizationMembership(
   octokit: any,
   organization: string,
-  repositoryAdmin: string
+  repositoryAdmin: string,
+  logger?: AppLogger
 ): Promise<ApiError | null> {
   try {
+    logger?.debug({ organization, repositoryAdmin }, 'Validating organization membership');
     await octokit.orgs.getMembershipForUser({
       org: organization,
       username: repositoryAdmin
     });
+    logger?.debug({ organization, repositoryAdmin }, 'Organization membership confirmed');
     return null; // Success - user is a member
   } catch (membershipError: any) {
     const status = membershipError.response?.status;
@@ -34,12 +37,21 @@ export async function validateOrganizationMembership(
       errorCode = "MEMBERSHIP_VERIFICATION_FAILED";
     }
     
-    return {
+    const errorResponse: ApiError = {
       success: false,
       errorCode: errorCode,
       message: errorMessage,
       timestamp: new Date().toISOString()
     };
+
+    logger?.warn({
+      organization,
+      repositoryAdmin,
+      status,
+      errorCode
+    }, 'Organization membership validation failed');
+
+    return errorResponse;
   }
 }
 
@@ -49,33 +61,45 @@ export async function validateOrganizationMembership(
 export async function validateRepositoryAvailability(
   octokit: any,
   organization: string,
-  repositoryName: string
+  repositoryName: string,
+  logger?: AppLogger
 ): Promise<ApiError | null> {
   try {
+    logger?.debug({ organization, repositoryName }, 'Checking repository availability');
     await octokit.repos.get({
       owner: organization,
       repo: repositoryName
     });
     
     // If we get here, the repository exists
-    return {
+    const errorResponse: ApiError = {
       success: false,
       errorCode: "REPOSITORY_ALREADY_EXISTS",
       message: `Repository ${organization}/${repositoryName} already exists`,
       timestamp: new Date().toISOString()
     };
+    logger?.warn({ organization, repositoryName }, 'Repository already exists');
+    return errorResponse;
   } catch (repoCheckError: any) {
     // 404 means repository doesn't exist, which is what we want
     if (repoCheckError.response?.status !== 404) {
       // Some other error occurred while checking
-      return {
+      const errorResponse: ApiError = {
         success: false,
         errorCode: "REPOSITORY_AVAILABILITY_CHECK_FAILED",
         message: `Failed to verify repository availability: ${repoCheckError.message}`,
         timestamp: new Date().toISOString()
       };
+      logger?.error({
+        organization,
+        repositoryName,
+        status: repoCheckError.response?.status,
+        errorCode: "REPOSITORY_AVAILABILITY_CHECK_FAILED"
+      }, 'Repository availability check encountered an unexpected error');
+      return errorResponse;
     }
     // Repository doesn't exist, we can proceed
+    logger?.debug({ organization, repositoryName }, 'Repository name is available');
     return null;
   }
 }
@@ -119,18 +143,24 @@ export async function addRepositoryAdmin(
   repositoryName: string,
   repositoryAdmin: string,
   fullName: string,
-  logger: any
+  logger: AppLogger
 ): Promise<void> {
   try {
+    logger.debug({ organization, repositoryName, repositoryAdmin }, 'Adding repository admin collaborator');
     await octokit.repos.addCollaborator({
       owner: organization,
       repo: repositoryName,
       username: repositoryAdmin,
       permission: 'admin'
     });
-    logger.info(`Added ${repositoryAdmin} as admin to ${fullName}`);
+    logger.info({ fullName, repositoryAdmin }, 'Added repository admin collaborator');
   } catch (collaboratorError: any) {
-    logger.warn(`Failed to add ${repositoryAdmin} as admin: ${collaboratorError.message}`);
+    logger.warn({
+      organization,
+      repositoryName,
+      repositoryAdmin,
+      error: collaboratorError.message
+    }, 'Failed to add repository admin collaborator');
     // Continue execution - repository was created successfully
   }
 }
@@ -203,7 +233,7 @@ export async function createInitialIssue(
   organization: string,
   repositoryName: string,
   repositoryAdmin?: string,
-  logger?: any
+  logger?: AppLogger
 ): Promise<void> {
   try {
     const adminMention = repositoryAdmin ? `@${repositoryAdmin}` : 'the repository admin';
@@ -217,6 +247,8 @@ export async function createInitialIssue(
       adminMention
     });
 
+    logger?.debug({ organization, repositoryName }, 'Creating initial setup issue');
+
     await octokit.issues.create({
       owner: organization,
       repo: repositoryName,
@@ -225,9 +257,14 @@ export async function createInitialIssue(
       labels: ['documentation', 'good first issue', 'setup']
     });
 
-    logger?.info(`Created initial setup issue in ${organization}/${repositoryName}${repositoryAdmin ? ` mentioning ${repositoryAdmin}` : ''}`);
+    logger?.info({ organization, repositoryName, repositoryAdmin }, 'Created initial setup issue');
   } catch (error: any) {
-    logger?.warn(`Failed to create initial issue in ${organization}/${repositoryName}: ${error.message}`);
+    logger?.warn({
+      organization,
+      repositoryName,
+      repositoryAdmin,
+      error: error.message
+    }, 'Failed to create initial setup issue');
     // Don't throw error - repository creation was successful, issue creation is bonus
   }
 }
